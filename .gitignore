@@ -1,0 +1,12 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+out/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+.env
+tools/generator/.venv/
+tools/generator/output/
+scripts/.venv/
