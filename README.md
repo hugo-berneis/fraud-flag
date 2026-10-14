@@ -1,14 +1,6 @@
 # fraud-flag
 
-A streaming payment-fraud triage service, built as a learning project pairing a 2nd-year CS
-student with Claude. A Python generator fakes card transactions (with injected fraud patterns)
-onto Kafka; a Spring Boot consumer computes behavioral features in code, runs hard rules first,
-falls back to a decision client ("Jev") for the ambiguous cases, and routes each transaction to
-auto-approve, hold, or a human review queue -- with an LLM-written case summary for the uncertain
-ones and a Postgres audit row for every single decision.
-
-Full phase-by-phase build plan and progress log: [`CLAUDE.md`](CLAUDE.md). New-to-Java/Spring
-notes picked up along the way: [`docs/java-notes.md`](docs/java-notes.md).
+A streaming payment-fraud triage service.
 
 ## Architecture
 
@@ -77,14 +69,3 @@ Review queue: `curl localhost:8080/review-queue`, then
 See [`docs/deploy.md`](docs/deploy.md) -- a single EC2 instance running the same
 `docker-compose.yml`, with an override for shipping logs to CloudWatch. Every billable command is
 written for you to run yourself; nothing in this repo creates AWS resources automatically.
-
-## Known limitations
-
-- `DecisionClient`'s real implementation doesn't exist -- `MockDecisionClient` is active because
-  no documented request/response shape for Jev's real `noul`/`choice` API exists yet (a key for a
-  service called TypeSafe is in `.env`, but without docs it's not wired in, per the project's own
-  "don't invent SDK calls" rule).
-- Single EC2 instance, no redundancy; Kafka/Postgres data don't survive instance termination.
-- No LLM cost tracking yet (see Results above).
-- The generator and the service share the same Kafka topic and schema by convention, not by a
-  shared schema registry -- fine for a 3-week MVP, a real system would want one.
