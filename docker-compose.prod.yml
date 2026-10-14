@@ -1,0 +1,13 @@
+# Override applied only on the EC2 instance: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+# Ships the app container's stdout (our JSON logs) to CloudWatch Logs via Docker's built-in
+# awslogs driver. Requires the EC2 instance's IAM role to allow logs:CreateLogGroup,
+# logs:CreateLogStream, and logs:PutLogEvents -- see docs/deploy.md.
+services:
+  app:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: /fraud-flag/app
+        awslogs-create-group: "true"
+        awslogs-stream: app

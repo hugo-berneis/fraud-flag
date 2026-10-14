@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jev vs. LLM vs. Rules: Fraud Decision Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #084f6a;      /* Jev */
+    --ocean: #0b76a0;     /* LLM */
+    --amber: #c98a3e;     /* Rules engine / caution */
+    --gray-bg: #e8e8e8;
+    --gray-light: #f4f5f6;
+    --text: #1f2a30;
+    --muted: #6c7a82;
+  }
+  @page { size: 11in 8.5in; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 11in;
+    font-family: "Open Sans", Arial, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .num { font-family: "Montserrat", Arial, sans-serif; }
+
+  .page {
+    width: 11in;
+    height: 8.5in;
+    padding: 0.45in 0.55in 0.35in 0.55in;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- Header ---------- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid var(--navy);
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  .header-left .eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--ocean);
+    font-weight: 700;
+    margin-bottom: 4px;
+    font-family: "Montserrat", Arial, sans-serif;
+  }
+  .header-left h1 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.3px;
+    color: var(--navy);
+  }
+  .header-right {
+    text-align: right;
+    font-size: 9.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .header-right strong { color: var(--text); }
+
+  /* ---------- Mock-data banner ---------- */
+  .banner {
+    background: #fbf1e3;
+    border: 1px solid var(--amber);
+    border-radius: 8px;
+    padding: 9px 15px;
+    font-size: 10px;
+    color: #6b4a1e;
+    margin-bottom: 16px;
+  }
+  .banner strong { color: var(--amber); text-transform: uppercase; letter-spacing: 0.6px; }
+
+  /* ---------- Legend / key ---------- */
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .legend-item {
+    flex: 1;
+    border-radius: 8px;
+    padding: 11px 15px;
+    color: #fff;
+  }
+  .legend-item .name { font-size: 13px; font-weight: 700; font-family: "Montserrat", Arial, sans-serif; }
+  .legend-item .desc { font-size: 9px; opacity: 0.94; margin-top: 3px; }
+  .legend-rules { background: var(--amber); }
+  .legend-jev { background: var(--navy); }
+  .legend-llm { background: var(--ocean); }
+
+  /* ---------- Chart panels ---------- */
+  .panels { display: flex; gap: 18px; flex: 1; min-height: 0; }
+  .panel {
+    flex: 1;
+    background: var(--gray-light);
+    border: 1px solid #dde1e4;
+    border-radius: 10px;
+    padding: 16px 18px 12px 18px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel h2 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.1px;
+  }
+  .panel .panel-sub {
+    font-size: 8.8px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .chart-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+  .chart-row { margin-bottom: 14px; }
+  .chart-row:last-child { margin-bottom: 0; }
+  .chart-row .dim-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .bar-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+  }
+  .bar-tag {
+    width: 46px;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .bar-track {
+    display: block;
+    flex: 1;
+    background: #e2e5e8;
+    border-radius: 3px;
+    height: 11px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+  }
+  .bar-fill.rules { background: var(--amber); }
+  .bar-fill.jev { background: var(--navy); }
+  .bar-fill.llm { background: var(--ocean); }
+  .bar-num {
+    width: 46px;
+    font-size: 8.3px;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .scale-note {
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: auto;
+    padding-top: 10px;
+    font-style: italic;
+  }
+
+  .footer {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #e3e5e9;
+    font-size: 8px;
+    color: #9aa0a8;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ---------- Page 2: pros / cons ---------- */
+  .pc-page-header { margin-bottom: 18px; }
+  .pc-page-header .eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--ocean);
+    font-weight: 700;
+    margin-bottom: 4px;
+    font-family: "Montserrat", Arial, sans-serif;
+  }
+  .pc-page-header h1 {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--navy);
+  }
+
+  .proscons {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+  }
+  .pc-card {
+    flex: 1;
+    background: var(--gray-light);
+    border: 1px solid #dde1e4;
+    border-top: 5px solid var(--amber);
+    border-radius: 10px;
+    padding: 16px 18px 18px 18px;
+    display: flex;
+    flex-direction: column;
+  }
+  .pc-card.jev { border-top-color: var(--navy); }
+  .pc-card.llm { border-top-color: var(--ocean); }
+  .pc-card h3 {
+    font-size: 15px;
+    margin: 0 0 2px 0;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .pc-card .pc-example {
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .pc-cols { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+  .pc-col { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pc-col.pro { padding-bottom: 12px; border-bottom: 1px solid #dde1e4; }
+  .pc-label {
+    font-size: 8.5px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 7px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid;
+  }
+  .pc-label.pro { color: #15795f; border-color: #15795f; }
+  .pc-label.con { color: #a13b3b; border-color: #a13b3b; }
+  .pc-label.neutral { color: var(--muted); border-color: #c7cbd0; }
+  .pc-col ul {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    margin: 0;
+    padding-left: 14px;
+    color: #33363c;
+  }
+  .pc-col.pro ul { font-size: 10px; line-height: 1.4; }
+  .pc-col.con ul { font-size: 9px; line-height: 1.38; color: #55585e; }
+  .pc-col li { margin-bottom: 0; }
+
+  .pc-bestfit {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #dde1e4;
+  }
+  .pc-bestfit .pc-label { margin-bottom: 6px; }
+  .pc-bestfit p {
+    margin: 0;
+    font-size: 9.3px;
+    line-height: 1.45;
+    color: #33363c;
+  }
+
+  /* ---------- Page 3: Why this architecture ---------- */
+  .why-page-header { margin-bottom: 14px; }
+  .why-page-header .eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--ocean);
+    font-weight: 700;
+    margin-bottom: 4px;
+    font-family: "Montserrat", Arial, sans-serif;
+  }
+  .why-page-header h1 {
+    font-size: 27px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--navy);
+  }
+  .why-para {
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #2a333a;
+    max-width: 9.3in;
+    margin-bottom: 18px;
+  }
+  .why-para strong { color: var(--navy); }
+  .why-para .flag { color: var(--amber); }
+
+  .vchart-wrap {
+    flex: 1;
+    background: var(--gray-light);
+    border: 1px solid #dde1e4;
+    border-radius: 10px;
+    padding: 22px 36px 18px 36px;
+    display: flex;
+    flex-direction: column;
+  }
+  .vchart-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 2px;
+  }
+  .vchart-sub {
+    font-size: 9.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .vbar-chart {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 90px;
+    padding-bottom: 0;
+  }
+  .vbar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .vbar-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    height: 260px;
+  }
+  .vbar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+  }
+  .vbar {
+    position: relative;
+    width: 64px;
+    border-radius: 5px 5px 2px 2px;
+  }
+  .vbar.rules { background: var(--amber); }
+  .vbar.jev { background: var(--navy); }
+  .vbar.llm { background: var(--ocean); }
+  .vbar-val {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .vbar-tag {
+    margin-top: 6px;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .vbar-baseline {
+    width: 100%;
+    height: 2px;
+    background: #c7cbd0;
+    margin-top: 0;
+  }
+  .vbar-group-label {
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    max-width: 220px;
+  }
+  .vchart-note {
+    font-size: 8px;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 14px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ========== PAGE 1: Visual comparison ========== -->
+  <div class="page">
+    <div class="header">
+      <div class="header-left">
+        <div class="eyebrow">Decision pipeline reference</div>
+        <h1>Jev vs. LLM vs. Rules: Fraud Decision Pipeline</h1>
+      </div>
+      <div class="header-right">
+        Built for <strong>fraud-flag</strong>, a streaming payment-fraud triage service<br>
+        Rules decide the obvious cases, Jev the ambiguous ones, Claude only writes case summaries
+      </div>
+    </div>
+
+    <div class="banner">
+      <strong>Partially mock:</strong> <code>DecisionClient</code> is still <code>MockDecisionClient</code> --
+      no documented request/response shape for the real Jev (TypeSafe) <code>noul</code>/<code>choice</code>
+      API exists yet for this project, per CLAUDE.md's "don't invent SDK calls" rule. <code>CaseSummaryClient</code>
+      is the real Anthropic API (Claude Haiku 4.5) -- wired and used in the run below. Both panels are real
+      output from this repo, just split by which decision-maker actually handled each case.
+    </div>
+
+    <div class="legend">
+      <div class="legend-item legend-rules">
+        <div class="name">Rules Engine</div>
+        <div class="desc">Hard-coded checks for obvious cases (RulesEngine.java)</div>
+      </div>
+      <div class="legend-item legend-jev">
+        <div class="name">Jev (mock DecisionClient)</div>
+        <div class="desc">Bounded noul()/choice() calls for whatever a rule didn't resolve</div>
+      </div>
+      <div class="legend-item legend-llm">
+        <div class="name">LLM: Claude Haiku 4.5 (real)</div>
+        <div class="desc">Writes a case summary for REVIEW cases -- never decides</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Decision volume by path</h2>
+        <div class="panel-sub">n=240 decisions, this repo's accumulated local runs (decisions table)</div>
+        <div class="chart-rows">
+          <div class="chart-row">
+            <div class="dim-label">Rule-decided (hard rule fired)</div>
+            <div class="bar-line"><span class="bar-tag">Rules</span><span class="bar-track"><span class="bar-fill rules" style="width:42.1%"></span></span><span class="bar-num">101 (42.1%)</span></div>
+          </div>
+          <div class="chart-row">
+            <div class="dim-label">Jev-decided, no escalation</div>
+            <div class="bar-line"><span class="bar-tag">Jev</span><span class="bar-track"><span class="bar-fill jev" style="width:56.7%"></span></span><span class="bar-num">136 (56.7%)</span></div>
+          </div>
+          <div class="chart-row">
+            <div class="dim-label">Escalated to REVIEW (LLM wrote a summary)</div>
+            <div class="bar-line"><span class="bar-tag">LLM</span><span class="bar-track"><span class="bar-fill llm" style="width:1.3%"></span></span><span class="bar-num">3 (1.3%)</span></div>
+          </div>
+        </div>
+        <div class="scale-note">Rules and Jev together resolve ~99% of traffic without ever reaching the LLM -- that's by design, see page 3.</div>
+      </div>
+      <div class="panel">
+        <h2>Pipeline accuracy vs. ground truth</h2>
+        <div class="panel-sub">n=120 labeled transactions, one generator run, scripts/score.py</div>
+        <div class="chart-rows">
+          <div class="chart-row">
+            <div class="dim-label">Precision</div>
+            <div class="bar-line"><span class="bar-tag">Overall</span><span class="bar-track"><span class="bar-fill jev" style="width:76.1%"></span></span><span class="bar-num">76.1%</span></div>
+          </div>
+          <div class="chart-row">
+            <div class="dim-label">Recall</div>
+            <div class="bar-line"><span class="bar-tag">Overall</span><span class="bar-track"><span class="bar-fill jev" style="width:77.8%"></span></span><span class="bar-num">77.8%</span></div>
+          </div>
+          <div class="chart-row">
+            <div class="dim-label">Auto-resolve rate</div>
+            <div class="bar-line"><span class="bar-tag">Overall</span><span class="bar-track"><span class="bar-fill rules" style="width:99.2%"></span></span><span class="bar-num">99.2%</span></div>
+          </div>
+          <div class="chart-row">
+            <div class="dim-label">Escalation rate</div>
+            <div class="bar-line"><span class="bar-tag">Overall</span><span class="bar-track"><span class="bar-fill llm" style="width:0.8%"></span></span><span class="bar-num">0.8%</span></div>
+          </div>
+        </div>
+        <div class="scale-note">These are pipeline-wide (rules + mock Jev combined) -- ground truth doesn't label which component made each call.</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Source: fraud-flag (this repo), Postgres `decisions` table and scripts/score.py. Real data from local runs, not benchmarked/published figures.</span>
+      <span>fraud-flag &middot; docs/jev-vs-llm-vs-rules.pdf &middot; page 1 of 3</span>
+    </div>
+  </div>
+
+  <!-- ========== PAGE 2: Pros / cons ========== -->
+  <div class="page">
+    <div class="pc-page-header">
+      <div class="eyebrow">Decision pipeline reference</div>
+      <h1>Pros &amp; Cons by Approach</h1>
+    </div>
+
+    <div class="proscons">
+      <div class="pc-card">
+        <h3>Rules Engine</h3>
+        <div class="pc-example">RulesEngine.java</div>
+        <div class="pc-cols">
+          <div class="pc-col pro">
+            <div class="pc-label pro">Pros</div>
+            <ul>
+              <li>Zero latency: 0.07ms average in this run, no network call at all</li>
+              <li>Fully deterministic and explainable -- the exact condition is visible in the diff</li>
+              <li>No API cost, no dependency on an external service being up</li>
+              <li>Catches the fraud patterns the generator itself injects, by construction</li>
+            </ul>
+          </div>
+          <div class="pc-col con">
+            <div class="pc-label con">Cons</div>
+            <ul>
+              <li>Only as good as the rules someone wrote -- a new pattern needs a new rule</li>
+              <li>Binary: no notion of "a little suspicious" vs. "extremely suspicious"</li>
+              <li>Easy to write a rule that's too broad and silently swallows edge cases</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pc-bestfit">
+          <div class="pc-label neutral">Best fit</div>
+          <p>The small number of fraud patterns with an unambiguous signature -- a burst of tiny
+          card-testing charges, an amount 10x the account's usual spend. Exactly Phase 3's
+          "obvious cases" design intent.</p>
+        </div>
+      </div>
+
+      <div class="pc-card jev">
+        <h3>Jev</h3>
+        <div class="pc-example">DecisionClient / MockDecisionClient</div>
+        <div class="pc-cols">
+          <div class="pc-col pro">
+            <div class="pc-label pro">Pros</div>
+            <ul>
+              <li>Structurally bounded: noul() always returns boolean+confidence, choice() always
+              returns one of the given fraud types -- can't answer outside that shape</li>
+              <li>Fast enough to run on every transaction that reaches it (136/240 here, &lt;0.1ms avg)</li>
+              <li>The interface seam means a real Jev client swaps in later with zero other code changes</li>
+            </ul>
+          </div>
+          <div class="pc-col con">
+            <div class="pc-label con">Cons</div>
+            <ul>
+              <li>Still MockDecisionClient here -- no real Jev/TypeSafe calibration data exists
+              for this project yet, unlike confidence-audit's project where a real smoke test already ran</li>
+              <li>Mock confidence is a simple suspicious-category count, not a trained/calibrated score</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pc-bestfit">
+          <div class="pc-label neutral">Best fit</div>
+          <p>The ambiguous middle: cases a rule doesn't confidently resolve but still need a fast,
+          bounded fraud/not-fraud call to decide routing.</p>
+        </div>
+      </div>
+
+      <div class="pc-card llm">
+        <h3>LLM (Claude Haiku 4.5)</h3>
+        <div class="pc-example">CaseSummaryClient / AnthropicCaseSummaryClient</div>
+        <div class="pc-cols">
+          <div class="pc-col pro">
+            <div class="pc-label pro">Pros</div>
+            <ul>
+              <li>The only one of the three that writes prose a human reviewer can actually read</li>
+              <li>Real and wired, not mocked -- actually called Claude Haiku 4.5 in the run behind this doc</li>
+              <li>Never asked to decide, only to explain -- its failure mode can't silently flip a route</li>
+            </ul>
+          </div>
+          <div class="pc-col con">
+            <div class="pc-label con">Cons</div>
+            <ul>
+              <li>By far the slowest path measured: 8.5s average, 23s max in this run, vs.
+              sub-millisecond for the other two -- only viable gated to ~1% of traffic</li>
+              <li>Costs money per call, unlike the other two</li>
+              <li>One of three live calls in this run returned an empty response with no error --
+              needs a retry/fallback that doesn't exist yet</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pc-bestfit">
+          <div class="pc-label neutral">Best fit</div>
+          <p>Exactly the ~1% of cases that reach REVIEW -- never routing itself, only making the
+          human reviewer's job faster once a transaction is already flagged as ambiguous.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Sources: this repo's src/main/java/com/fraudflag/decision/*.java and the same local run cited on page 1.</span>
+      <span>fraud-flag &middot; docs/jev-vs-llm-vs-rules.pdf &middot; page 2 of 3</span>
+    </div>
+  </div>
+
+  <!-- ========== PAGE 3: Why this architecture ========== -->
+  <div class="page">
+    <div class="why-page-header">
+      <div class="eyebrow">Decision pipeline reference</div>
+      <h1>Why Rules First, Jev Fallback, LLM Last?</h1>
+    </div>
+
+    <div class="why-para">
+      <p>The pipeline is layered cheapest-and-fastest-first. A <strong>hard rule</strong> runs first and,
+      when it fires, decides the route for free in well under a millisecond -- no network call, no cost,
+      fully explainable. Anything a rule doesn't confidently resolve falls to <strong>Jev</strong>, still
+      bounded and still fast, trading a little certainty for coverage of the ambiguous middle. Only the
+      rarest already-escalated case -- about <span class="flag">1% of traffic</span> in this run -- ever
+      pays the latency and dollar cost of a real LLM call, and even then the LLM <strong>never decides</strong>:
+      it only writes a case summary for the human who does. This is CLAUDE.md's explicit design, not
+      something improvised after the fact: "the LLM is called only for uncertain cases... and never
+      makes the decision."</p>
+    </div>
+
+    <div class="vchart-wrap">
+      <div class="vchart-title">Decision latency by path (log-scaled)</div>
+      <div class="vchart-sub">Same n=240 run as page 1 -- bar heights are log-scaled; the gap is the point</div>
+
+      <div class="vbar-chart">
+        <div class="vbar-group">
+          <div class="vbar-bars">
+            <div class="vbar-col">
+              <div class="vbar rules" style="height:4px"><span class="vbar-val">0.07ms</span></div>
+            </div>
+          </div>
+          <div class="vbar-baseline"></div>
+          <div class="vbar-group-label">Rules</div>
+        </div>
+
+        <div class="vbar-group">
+          <div class="vbar-bars">
+            <div class="vbar-col">
+              <div class="vbar jev" style="height:2px"><span class="vbar-val">&lt;0.01ms</span></div>
+            </div>
+          </div>
+          <div class="vbar-baseline"></div>
+          <div class="vbar-group-label">Jev (mock)</div>
+        </div>
+
+        <div class="vbar-group">
+          <div class="vbar-bars">
+            <div class="vbar-col">
+              <div class="vbar llm" style="height:260px"><span class="vbar-val">8,537ms avg<br>(23,028ms max)</span></div>
+            </div>
+          </div>
+          <div class="vbar-baseline"></div>
+          <div class="vbar-group-label">LLM (escalated cases only)</div>
+        </div>
+      </div>
+
+      <div class="vchart-note">Rules and Jev bars are near-invisible on purpose: they really are
+      ~100,000x faster than a live LLM call. That gap is exactly why escalation is capped near 1%
+      instead of routing every transaction through the LLM.</div>
+    </div>
+
+    <div class="footer">
+      <span>Source: fraud-flag (this repo), Postgres `decisions` table, this session's local runs. Next: real Jev client once TypeSafe docs exist; retry/fallback for empty LLM responses.</span>
+      <span>fraud-flag &middot; docs/jev-vs-llm-vs-rules.pdf &middot; page 3 of 3</span>
+    </div>
+  </div>
+
+</body>
+</html>

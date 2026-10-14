@@ -114,3 +114,22 @@ Concepts as they come up, newest at the bottom.
 - **DTOs instead of exposing the entity**: `ReviewController` returns `ReviewQueueItem`, a
   `record` built from `DecisionEntity`, rather than the entity itself — keeps the JPA mapping
   free to change without breaking the API, and avoids ever serializing a field nobody asked for.
+
+## Phase 5
+
+- **Multi-stage Docker build**: the `Dockerfile`'s first stage (`eclipse-temurin:21-jdk`) has the
+  full JDK and Gradle wrapper and produces `build/libs/*.jar`; the second stage
+  (`eclipse-temurin:21-jre-alpine`) only copies that jar in. The final image never contains
+  source code, the Gradle wrapper, or a compiler — smaller and nothing to accidentally ship.
+- **Same image, different config, via env vars**: `application.yml` reads `DB_HOST`/`DB_PORT`/
+  `KAFKA_BOOTSTRAP_SERVERS` with `localhost`-based defaults. Running `./gradlew bootRun` on your
+  machine needs no env vars at all (defaults just work); the same jar running as the `app`
+  service in `docker-compose.yml` gets those three env vars pointed at the other containers by
+  service name (`postgres`, `kafka:29092`) instead. One artifact, two environments, zero code
+  branching.
+- **Why Kafka needed two listeners**: a container reaches another container by service name
+  (`kafka:29092`), but a host-side tool (the Python generator, run outside Docker) reaches it via
+  `localhost:9092`. Kafka's protocol has clients reconnect using whatever address the broker
+  *advertises*, so one listener's advertised address can't satisfy both audiences — hence
+  `INTERNAL` (for other containers) and `EXTERNAL` (for the host) as two separate listeners on
+  the same broker.
